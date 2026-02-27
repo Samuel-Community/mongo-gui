@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-compass-bg: #001e2b;
+  --color-compass-sidebar: #001e2b;
+  --color-compass-border: #3d4f58;
+  --color-compass-green: #00ed64;
+  --color-compass-text: #e8edeb;
+  --color-compass-muted: #889397;
+  
+  /* Light theme adjustments */
+  --color-light-bg: #f1f5f9;
+  --color-light-sidebar: #ffffff;
+  --color-light-border: #cbd5e1;
+  --color-light-text: #0f172a;
+  --color-light-muted: #475569;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-light-bg);
+    color: var(--color-light-text);
+  }
+}
+
+.dark body {
+  background-color: var(--color-compass-bg);
+  color: var(--color-compass-text);
+}
