@@ -96,6 +96,16 @@ Replace domain.com with your domain
 
 ---
 
+
+## 🖼️ Screen
+
+![login](https://media.tutorapide.xyz/Nvsw402SUImx.png)
+![dasboard](https://media.tutorapide.xyz/d9kuOaAmeCmH.png)
+![database](https://media.tutorapide.xyz/IzSAvupLDrEj.png)
+![stats](https://media.tutorapide.xyz/tPROsqDWfydV.png)
+![settings](https://media.tutorapide.xyz/YlqD5IM4RSnw.png)
+
+---
 ## 🤖 AI Contribution
 
 Developed with AI assistance to optimize Nginx configurations, Next.js 15 middleware logic, and secure authentication workflows.
