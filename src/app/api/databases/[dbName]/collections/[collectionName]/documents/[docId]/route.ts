@@ -1,57 +1,59 @@
-import { NextResponse } from "next/server";
-import clientPromise from "@/src/lib/mongodb";
-import { ObjectId } from "mongodb";
+import { NextResponse } from 'next/server';
+import clientPromise from '@/src/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ dbName: string; collectionName: string; docId: string }> }
-) {
+type Params = { params: Promise<{ dbName: string; collectionName: string; docId: string }> };
+
+function parseObjectId(id: string): ObjectId | null {
+  try { return new ObjectId(id); } catch { return null; }
+}
+
+export async function DELETE(_request: Request, { params }: Params) {
   try {
     const { dbName, collectionName, docId } = await params;
+    const oid = parseObjectId(docId);
+    if (!oid) return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 });
+
     const client = await clientPromise;
-    const db = client.db(dbName);
-    const collection = db.collection(collectionName);
-    
-    const result = await collection.deleteOne({ _id: new ObjectId(docId) });
-    
-    if (result.deletedCount === 1) {
-      return NextResponse.json({ message: "Document deleted successfully" });
-    } else {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+    const result = await client.db(dbName).collection(collectionName).deleteOne({ _id: oid });
+
+    if (result.deletedCount === 0) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
-  } catch (error: any) {
-    console.error("Delete Document API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, message: 'Document deleted' });
+  } catch (err) {
+    console.error('Delete document error:', err);
+    return NextResponse.json({ error: 'Failed to delete document' }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ dbName: string; collectionName: string; docId: string }> }
-) {
+export async function PATCH(request: Request, { params }: Params) {
   try {
     const { dbName, collectionName, docId } = await params;
-    const body = await request.json();
-    
-    // Remove _id from body if present to avoid immutable field error
-    const { _id, ...updateData } = body;
-    
+    const oid = parseObjectId(docId);
+    if (!oid) return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 });
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
+    }
+
+    // Remove _id to avoid MongoDB immutable field error
+    const { _id, ...updateData } = body as Record<string, unknown>;
+    void _id;
+
     const client = await clientPromise;
-    const db = client.db(dbName);
-    const collection = db.collection(collectionName);
-    
-    const result = await collection.updateOne(
-      { _id: new ObjectId(docId) },
+    const result = await client.db(dbName).collection(collectionName).updateOne(
+      { _id: oid },
       { $set: updateData }
     );
-    
-    if (result.matchedCount === 1) {
-      return NextResponse.json({ message: "Document updated successfully" });
-    } else {
-      return NextResponse.json({ error: "Document not found" }, { status: 404 });
+
+    if (result.matchedCount === 0) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 });
     }
-  } catch (error: any) {
-    console.error("Update Document API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, message: 'Document updated' });
+  } catch (err) {
+    console.error('Update document error:', err);
+    return NextResponse.json({ error: 'Failed to update document' }, { status: 500 });
   }
 }
