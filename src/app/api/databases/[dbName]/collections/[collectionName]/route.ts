@@ -1,29 +1,31 @@
-import { NextResponse } from "next/server";
-import clientPromise from "@/src/lib/mongodb";
+import { NextResponse } from 'next/server';
+import clientPromise from '@/src/lib/mongodb';
+import { SYSTEM_DATABASES } from '@/src/lib/constants';
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ dbName: string; collectionName: string }> }
 ) {
   try {
     const { dbName, collectionName } = await params;
-    
-    // Prevent dropping system collections if necessary (optional, but good practice)
-    if (dbName === "admin" || dbName === "local" || dbName === "config") {
-       // Usually we don't want to mess with these via UI
+
+    // Block operations on system databases — with an actual return this time
+    if ((SYSTEM_DATABASES as readonly string[]).includes(dbName)) {
+      return NextResponse.json(
+        { error: `Cannot drop collections from system database "${dbName}"` },
+        { status: 403 }
+      );
     }
 
     const client = await clientPromise;
-    const db = client.db(dbName);
-    
-    await db.collection(collectionName).drop();
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: `Collection ${collectionName} dropped successfully from ${dbName}` 
+    await client.db(dbName).collection(collectionName).drop();
+
+    return NextResponse.json({
+      success: true,
+      message: `Collection "${collectionName}" dropped from "${dbName}"`,
     });
-  } catch (error: any) {
-    console.error("Drop Collection API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (err) {
+    console.error('Drop collection error:', err);
+    return NextResponse.json({ error: 'Failed to drop collection' }, { status: 500 });
   }
 }
