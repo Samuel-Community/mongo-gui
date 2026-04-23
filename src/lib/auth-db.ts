@@ -1,52 +1,82 @@
 import Database from 'better-sqlite3';
-import bcrypt from 'bcryptjs';
-import crypto from 'crypto';
-import chalk from 'chalk';
-import path from 'path';
-import fs from 'fs';
+import bcrypt   from 'bcryptjs';
+import crypto   from 'crypto';
+import chalk    from 'chalk';
+import path     from 'path';
+import fs       from 'fs';
 
-const DB_PATH = path.join(process.cwd(), 'auth.db');
+/**
+ * Resolve the SQLite database path.
+ *
+ * Priority:
+ *   1. AUTH_DB_PATH env variable          (absolute path — recommended for prod)
+ *   2. /var/lib/mongo-gui/auth.db          (Linux production default, out-of-webroot)
+ *   3. <project-root>/auth.db              (dev fallback, shows a warning)
+ */
+function resolveDbPath(): string {
+  if (process.env.AUTH_DB_PATH) return process.env.AUTH_DB_PATH;
 
-let db: Database.Database;
+  if (process.env.NODE_ENV === 'production') {
+    const productionPath = '/var/lib/mongo-gui/auth.db';
+    const dir = path.dirname(productionPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    }
+    return productionPath;
+  }
 
-export function initAuthDb() {
+  // Development fallback
+  console.warn(
+    '[WARN] auth.db is stored at project root. ' +
+    'Set AUTH_DB_PATH to an out-of-webroot location in production.'
+  );
+  return path.join(process.cwd(), 'auth.db');
+}
+
+const DB_PATH = resolveDbPath();
+let db: Database.Database | undefined;
+
+export function initAuthDb(): Database.Database {
   if (db) return db;
 
   db = new Database(DB_PATH);
-  
+  db.pragma('journal_mode = WAL');
+
+  // Restrict file to owner read/write only
+  try { fs.chmodSync(DB_PATH, 0o600); } catch { /* ignore on Windows */ }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE,
-      password_hash TEXT
+      id            INTEGER PRIMARY KEY AUTOINCREMENT,
+      username      TEXT    UNIQUE NOT NULL,
+      password_hash TEXT    NOT NULL
     )
   `);
 
-  const adminUser = db.prepare('SELECT * FROM users WHERE username = ?').get('admin') as any;
+  const existing = db.prepare('SELECT id FROM users WHERE username = ?').get('admin');
 
-  if (!adminUser) {
-    const password = crypto.randomBytes(8).toString('hex'); // 16 characters
-    const salt = bcrypt.genSaltSync(10);
-    const hash = bcrypt.hashSync(password, salt);
+  if (!existing) {
+    const password = crypto.randomBytes(8).toString('hex'); // 16 hex chars
+    const hash     = bcrypt.hashSync(password, 12);
 
     db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)').run('admin', hash);
 
-    const boxWidth = 60;
-    const line = '═'.repeat(boxWidth);
-    const title = ' MONGODB WEBGUI - INITIAL SETUP ';
-    const padding = Math.floor((boxWidth - title.length) / 2);
-    
-    console.log('\n' + chalk.yellow.bold('╔' + line + '╗'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(padding) + title + ' '.repeat(boxWidth - title.length - padding) + '║'));
-    console.log(chalk.yellow.bold('╠' + line + '╣'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(2) + 'An admin account has been automatically created.' + ' '.repeat(boxWidth - 50) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(2) + 'Please save these credentials securely:' + ' '.repeat(boxWidth - 41) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(boxWidth) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(4) + 'Username: ' + chalk.green.bold('admin') + ' '.repeat(boxWidth - 19) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(4) + 'Password: ' + chalk.green.bold(password) + ' '.repeat(boxWidth - 19 - password.length + 5) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(boxWidth) + '║'));
-    console.log(chalk.yellow.bold('║' + ' '.repeat(2) + 'You can now log in at: ' + chalk.blue('/login') + ' '.repeat(boxWidth - 30) + '║'));
-    console.log(chalk.yellow.bold('╚' + line + '╝') + '\n');
+    const W  = 60;
+    const ln = '═'.repeat(W);
+    const T  = ' MONGODB WEBGUI - INITIAL SETUP ';
+    const p  = Math.floor((W - T.length) / 2);
+
+    console.log('\n' + chalk.yellow.bold('╔' + ln + '╗'));
+    console.log(chalk.yellow.bold('║' + ' '.repeat(p) + T + ' '.repeat(W - T.length - p) + '║'));
+    console.log(chalk.yellow.bold('╠' + ln + '╣'));
+    console.log(chalk.yellow.bold('║  An admin account has been automatically created.          ║'));
+    console.log(chalk.yellow.bold('║  Save these credentials now — they will not be shown again.║'));
+    console.log(chalk.yellow.bold('║                                                             ║'));
+    console.log(chalk.yellow.bold('║    Username : ') + chalk.green.bold('admin') + chalk.yellow.bold(' '.repeat(W - 20) + '║'));
+    console.log(chalk.yellow.bold('║    Password : ') + chalk.green.bold(password) + chalk.yellow.bold(' '.repeat(W - 20 - password.length + 5) + '║'));
+    console.log(chalk.yellow.bold('║                                                             ║'));
+    console.log(chalk.yellow.bold('║  Log in at: ') + chalk.blue('/login') + chalk.yellow.bold(' '.repeat(W - 21) + '║'));
+    console.log(chalk.yellow.bold('╚' + ln + '╝') + '\n');
   }
 
   return db;
@@ -54,7 +84,9 @@ export function initAuthDb() {
 
 export function verifyAdminPassword(password: string): boolean {
   const database = initAuthDb();
-  const user = database.prepare('SELECT * FROM users WHERE username = ?').get('admin') as any;
+  const user = database
+    .prepare('SELECT password_hash FROM users WHERE username = ?')
+    .get('admin') as { password_hash: string } | undefined;
   if (!user) return false;
   return bcrypt.compareSync(password, user.password_hash);
 }
