@@ -1,36 +1,17 @@
 /**
- * Converts an array of objects (JSON) into a CSV string
- * Handles nested objects by converting them into JSON strings
+ * Converts an array of documents to a CSV string.
+ * Handles nested objects by JSON-stringifying them.
  */
-export const convertToCSV = (objArray: any[]) => {
-  if (!objArray || objArray.length === 0) return "";
+export function convertToCSV(docs: Record<string, unknown>[]): string {
+  if (!docs || docs.length === 0) return '';
 
-  // 1. Extract all possible headers
-  const headers = Array.from(
-    new Set(objArray.flatMap((doc) => Object.keys(doc))),
-  );
+  const headers = Array.from(new Set(docs.flatMap(d => Object.keys(d))));
+  const escape  = (val: unknown): string => {
+    if (val === null || val === undefined) return '""';
+    const str = typeof val === 'object' ? JSON.stringify(val) : String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+  };
 
-  const csvRows = [];
-
-  // 2. Add the header line
-  csvRows.push(headers.join(","));
-
-  // 3. Add data
-  for (const row of objArray) {
-    const values = headers.map((header) => {
-      let val = row[header];
-
-      // If it is an object (e.g. a Date or a subdocument), we stringify it.
-      if (val !== null && typeof val === "object") {
-        val = JSON.stringify(val);
-      }
-
-      // We escape the quotation marks and surround them with quotation marks to handle commas
-      const escaped = ("" + (val ?? "")).replace(/"/g, '""');
-      return `"${escaped}"`;
-    });
-    csvRows.push(values.join(","));
-  }
-
-  return csvRows.join("\n");
-};
+  const rows = docs.map(doc => headers.map(h => escape(doc[h])).join(','));
+  return [headers.join(','), ...rows].join('\n');
+}
