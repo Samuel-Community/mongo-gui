@@ -1,11 +1,20 @@
-// instrumentation.ts
+/**
+ * Next.js instrumentation hook — runs once at server startup (Node.js runtime only).
+ * Correct place for server-side singleton initialization.
+ * https://nextjs.org/docs/app/building-your-application/optimizing/instrumentation
+ */
 export async function register() {
-  // This function runs once when the server starts
   if (process.env.NEXT_RUNTIME === 'nodejs') {
-    // We import dynamically to ensure this only runs on the server side
+    // Validate JWT_SECRET early — crashes the server if missing/too short
+    await import('./lib/jwt');
+
+    // Initialize SQLite auth DB and create the admin user if needed
     const { initAuthDb } = await import('./lib/auth-db');
-    
-    console.log('--- Initializing Auth Database ---');
-    initAuthDb();
+    try {
+      initAuthDb();
+    } catch (err) {
+      console.error('[FATAL] Failed to initialize auth database:', err);
+      process.exit(1);
+    }
   }
 }
