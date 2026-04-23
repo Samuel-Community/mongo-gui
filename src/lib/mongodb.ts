@@ -1,37 +1,26 @@
-import { MongoClient } from "mongodb";
-import { initAuthDb } from "./auth-db";
+import { MongoClient } from 'mongodb';
 
-// Initialize Auth DB (SQLite) and generate admin password if needed
-try {
-  initAuthDb();
-} catch (e) {
-  console.error("Failed to initialize Auth DB:", e);
+if (!process.env.MONGODB_URI) {
+  throw new Error('[FATAL] MONGODB_URI environment variable is not set.');
 }
 
-const uri = process.env.MONGODB_URI;
-const options = {};
+const uri     = process.env.MONGODB_URI;
+const options = {
+  serverSelectionTimeoutMS: 5_000,
+  connectTimeoutMS:        10_000,
+};
 
-let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
-if (!uri) {
-  // During build time or if URI is missing, we provide a dummy promise that will fail when awaited
-  clientPromise = Promise.reject(new Error('Invalid/Missing environment variable: "MONGODB_URI"'));
-} else {
-  if (process.env.NODE_ENV === "development") {
-    let globalWithMongo = global as typeof globalThis & {
-      _mongoClientPromise?: Promise<MongoClient>;
-    };
-
-    if (!globalWithMongo._mongoClientPromise) {
-      client = new MongoClient(uri, options);
-      globalWithMongo._mongoClientPromise = client.connect();
-    }
-    clientPromise = globalWithMongo._mongoClientPromise;
-  } else {
-    client = new MongoClient(uri, options);
-    clientPromise = client.connect();
+if (process.env.NODE_ENV === 'development') {
+  // Reuse connection across hot-reloads in dev to avoid exhausting connections
+  const g = global as typeof globalThis & { _mongoClientPromise?: Promise<MongoClient> };
+  if (!g._mongoClientPromise) {
+    g._mongoClientPromise = new MongoClient(uri, options).connect();
   }
+  clientPromise = g._mongoClientPromise;
+} else {
+  clientPromise = new MongoClient(uri, options).connect();
 }
 
 export default clientPromise;
