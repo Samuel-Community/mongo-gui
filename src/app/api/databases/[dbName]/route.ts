@@ -1,29 +1,27 @@
-import { NextResponse } from "next/server";
-import clientPromise from "@/src/lib/mongodb";
+import { NextResponse } from 'next/server';
+import clientPromise from '@/src/lib/mongodb';
+import { SYSTEM_DATABASES } from '@/src/lib/constants';
 
 export async function DELETE(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ dbName: string }> }
 ) {
   try {
     const { dbName } = await params;
-    
-    // Prevent dropping system databases
-    if (["admin", "local", "config"].includes(dbName)) {
+
+    if ((SYSTEM_DATABASES as readonly string[]).includes(dbName)) {
       return NextResponse.json(
-        { error: "Cannot drop system databases (admin, local, config)" },
+        { error: `Cannot drop system database "${dbName}"` },
         { status: 403 }
       );
     }
 
     const client = await clientPromise;
-    const db = client.db(dbName);
-    
-    await db.dropDatabase();
-    
-    return NextResponse.json({ success: true, message: `Database ${dbName} dropped successfully` });
-  } catch (error: any) {
-    console.error("Drop Database API Error:", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    await client.db(dbName).dropDatabase();
+
+    return NextResponse.json({ success: true, message: `Database "${dbName}" dropped` });
+  } catch (err) {
+    console.error('Drop database error:', err);
+    return NextResponse.json({ error: 'Failed to drop database' }, { status: 500 });
   }
 }
