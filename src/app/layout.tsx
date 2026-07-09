@@ -5,8 +5,18 @@ import './globals.css';
 import Providers from '@/src/components/Providers';
 
 export const metadata: Metadata = {
-  title:       'MongoDB WebGUI',
-  description: 'A modern, secure web application for managing MongoDB databases.',
+  title:       'MongoGUI',
+  description: 'Open-source MongoDB Web GUI for exploring, querying, and managing databases.',
+  applicationName: 'MongoGUI',
+  manifest: '/site.webmanifest',
+  icons: {
+    icon: [
+      { url: '/favicon.ico', sizes: '48x48' },
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    apple: [{ url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
   robots: {
     index: false,
     follow: false,

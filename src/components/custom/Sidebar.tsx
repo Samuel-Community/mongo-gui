@@ -62,7 +62,10 @@ function SidebarComponent() {
         mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       )}>
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-compass-border h-16">
-          <span className="font-bold text-xl text-blue-700 dark:text-compass-green truncate">MongoGUI</span>
+          <Link href="/" className="flex items-center gap-3 min-w-0">
+            <img src="/favicon-96x96.png" alt="MongoGUI" className="h-9 w-9 rounded-xl shadow-sm" />
+            <span className="font-bold text-xl text-blue-700 dark:text-compass-green truncate">MongoGUI</span>
+          </Link>
           <div className="flex items-center gap-1">
             <ThemeToggle />
             <button

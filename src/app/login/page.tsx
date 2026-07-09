@@ -6,7 +6,7 @@ import { Button } from '@/src/components/ui/button';
 import { Input  } from '@/src/components/ui/input';
 import { Label  } from '@/src/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/src/components/ui/card';
-import { Database, Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock } from 'lucide-react';
 
 export default function LoginPage() {
   const [username,  setUsername]  = useState('');
@@ -53,12 +53,16 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900 p-4">
       <Card className="w-full max-w-md shadow-xl border-gray-200 dark:border-slate-800 dark:bg-slate-950">
         <CardHeader className="space-y-1 flex flex-col items-center">
-          <div className="p-3 bg-blue-600 rounded-2xl text-white mb-4">
-            <Database size={32} />
+          <div className="mb-4 flex flex-col items-center gap-3">
+            <img
+              src="/web-app-manifest-192x192.png"
+              alt="MongoGUI logo"
+              className="h-20 w-20 rounded-3xl shadow-lg shadow-emerald-950/20"
+            />
           </div>
-          <CardTitle className="text-2xl font-bold dark:text-gray-100">MongoDB WebGUI</CardTitle>
+          <CardTitle className="text-3xl font-bold dark:text-gray-100">MongoGUI</CardTitle>
           <CardDescription className="text-center dark:text-gray-400">
-            Enter your credentials to access the dashboard.
+            Open-source MongoDB Web GUI
             <br />
             <span className="text-xs text-amber-600 dark:text-amber-500 font-medium">
               Hint: Check your server console for the auto-generated password.

@@ -32,20 +32,94 @@ This project provides a browser-based GUI for exploring MongoDB databases, colle
 
 ## Requirements
 
+- Linux server recommended for production
 - Node.js 20+
+- npm 10+
 - MongoDB 6+
-- npm
+- Reverse proxy recommended: Nginx, Caddy, Traefik, or similar
 
 ## Installation
 
+### Fresh production install on Linux
+
+Use this method when deploying on a Linux server for production.
+
 ```bash
-npm install
+cd /var/www
+unzip mongo-gui.zip
+cd mongo-gui
+
+# Optional but recommended on a fresh server
+sudo apt update
+sudo apt install -y build-essential python3 make g++
+
+# Clean install
+rm -rf node_modules .next package-lock.json
+npm cache verify
+npm install --no-audit --no-fund --foreground-scripts
+
+# Create your environment file
 cp .env.example .env
+nano .env
+
+# Build and start
 npm run build
 npm run start:4000
 ```
 
-The app listens on `127.0.0.1` by default in the provided scripts. Put Nginx, Caddy, or another reverse proxy in front of it.
+The `--foreground-scripts` option is useful because some dependencies run install/postinstall scripts. It also makes the Monaco asset copy step visible.
+
+After the first successful install, npm will create a new `package-lock.json`. Keep this file for stable future deployments.
+
+### Future production updates
+
+After the first install, prefer `npm ci` because it uses the exact versions stored in `package-lock.json`.
+
+```bash
+cd /var/www/mongo-gui
+
+git pull
+# or replace the files with the new release archive
+
+rm -rf node_modules .next
+npm ci --no-audit --no-fund
+npm run build
+pm2 restart mongo-gui
+```
+
+If you do not use PM2, restart the app with your normal process manager.
+
+### Development install
+
+For local development:
+
+```bash
+npm install --no-audit --no-fund --foreground-scripts
+cp .env.example .env
+npm run dev
+```
+
+If `npm install` looks stuck without output, use:
+
+```bash
+npm install --no-audit --no-fund --foreground-scripts
+```
+
+You can also use verbose logs for debugging:
+
+```bash
+npm install --verbose
+```
+
+### Important note about `package-lock.json`
+
+For public releases, it is recommended to keep `package-lock.json` in the repository or release archive. This makes installations reproducible.
+
+If you intentionally deleted `package-lock.json` because you are deploying on Linux with an updated `package.json`, run one clean `npm install` on the Linux server, then keep the newly generated lockfile.
+
+### Binding and reverse proxy
+
+The app listens on `127.0.0.1` by default in the provided scripts. Put Nginx, Caddy, or another reverse proxy in front of it. Do not expose the Next.js port directly to the public internet.
 
 ## Environment variables
 
@@ -203,3 +277,17 @@ This project uses Next.js 16 proxy routing. Do not keep an old `src/middleware.t
 
 If Next.js detects a parent `package-lock.json`, the project sets `turbopack.root` in `next.config.mjs` to force the correct project root.
 
+
+## Branding / favicon assets
+
+The project includes a complete favicon set in `public/`:
+
+- `favicon.ico`
+- `favicon.svg`
+- `favicon-96x96.png`
+- `apple-touch-icon.png`
+- `web-app-manifest-192x192.png`
+- `web-app-manifest-512x512.png`
+- `site.webmanifest`
+
+The login page and sidebar use the same `MongoGUI` icon for consistent branding.
