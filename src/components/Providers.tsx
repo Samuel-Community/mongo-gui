@@ -5,7 +5,7 @@ import { ThemeProvider } from 'next-themes';
 import { useState } from 'react';
 import { ToastProvider } from '@/src/components/ui/toast';
 
-export default function Providers({ children }: { children: React.ReactNode }) {
+export default function Providers({ children, nonce }: { children: React.ReactNode; nonce?: string }) {
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -24,7 +24,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem enableColorScheme={false} disableTransitionOnChange nonce={nonce}>
         <ToastProvider>{children}</ToastProvider>
       </ThemeProvider>
     </QueryClientProvider>
