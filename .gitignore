@@ -8,4 +8,5 @@ coverage/
 !.env.example
 .next/
 auth.db
-package-lock.json
+*.sqlite
+*.sqlite3

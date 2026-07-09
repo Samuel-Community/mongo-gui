@@ -1,6 +1,19 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/src/lib/mongodb';
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_IMPORT_DOCUMENTS } from '@/src/lib/constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  MAX_IMPORT_BODY_BYTES,
+  MAX_IMPORT_DOCUMENTS,
+  MAX_PAGE_SIZE,
+  MONGO_QUERY_MAX_TIME_MS,
+} from '@/src/lib/constants';
+import {
+  blockSystemDatabaseWrite,
+  ensureWritable,
+  getRequestSize,
+  safeJsonArray,
+  safeJsonObject,
+} from '@/src/lib/api-guards';
 
 export async function GET(
   request: Request,
@@ -10,32 +23,40 @@ export async function GET(
     const { dbName, collectionName } = await params;
     const { searchParams } = new URL(request.url);
 
-    // Bounded pagination — no unbounded queries
-    const page  = Math.max(1, parseInt(searchParams.get('page')  ?? '1'));
+    const page  = Math.max(1, parseInt(searchParams.get('page') ?? '1'));
     const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, parseInt(searchParams.get('limit') ?? String(DEFAULT_PAGE_SIZE))));
 
     let filter: Record<string, unknown> = {};
-    const filterStr = searchParams.get('filter') ?? '{}';
+    let projection: Record<string, unknown> = {};
+    let sort: Record<string, 1 | -1> = {};
+
     try {
-      filter = JSON.parse(filterStr);
-      if (typeof filter !== 'object' || Array.isArray(filter)) {
-        return NextResponse.json({ error: 'Filter must be a JSON object' }, { status: 400 });
-      }
-    } catch {
-      return NextResponse.json({ error: 'Invalid filter JSON' }, { status: 400 });
+      filter = safeJsonObject(searchParams.get('filter'), {});
+      projection = safeJsonObject(searchParams.get('project'), {});
+      sort = safeJsonObject(searchParams.get('sort'), {}) as Record<string, 1 | -1>;
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 400 });
     }
 
     const client     = await clientPromise;
     const collection = client.db(dbName).collection(collectionName);
 
+    const findCursor = collection
+      .find(filter, { maxTimeMS: MONGO_QUERY_MAX_TIME_MS })
+      .project(projection)
+      .sort(sort as any)
+      .skip((page - 1) * limit)
+      .limit(limit);
+
     const [total, documents] = await Promise.all([
-      collection.countDocuments(filter),
-      collection.find(filter).skip((page - 1) * limit).limit(limit).toArray(),
+      collection.countDocuments(filter, { maxTimeMS: MONGO_QUERY_MAX_TIME_MS }),
+      findCursor.toArray(),
     ]);
 
     return NextResponse.json({
       documents,
-      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+      pagination: { total, page, limit, pages: Math.max(1, Math.ceil(total / limit)) },
+      query: { filter, projection, sort },
     });
   } catch (err) {
     console.error('Documents GET error:', err);
@@ -47,13 +68,31 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ dbName: string; collectionName: string }> }
 ) {
+  const readonly = ensureWritable();
+  if (readonly) return readonly;
+
   try {
     const { dbName, collectionName } = await params;
-    const data = await request.json().catch(() => null);
+    const systemBlocked = blockSystemDatabaseWrite(dbName);
+    if (systemBlocked) return systemBlocked;
 
-    if (!Array.isArray(data)) {
-      return NextResponse.json({ error: 'Import data must be a JSON array' }, { status: 400 });
+    const contentLength = getRequestSize(request);
+    if (contentLength && contentLength > MAX_IMPORT_BODY_BYTES) {
+      return NextResponse.json(
+        { error: `Import body too large. Max ${Math.round(MAX_IMPORT_BODY_BYTES / 1024 / 1024)} MB.` },
+        { status: 413 }
+      );
     }
+
+    const body = await request.json().catch(() => null);
+    let data: unknown[];
+
+    try {
+      data = safeJsonArray(body);
+    } catch (error) {
+      return NextResponse.json({ error: (error as Error).message }, { status: 400 });
+    }
+
     if (data.length === 0) {
       return NextResponse.json({ error: 'Array is empty' }, { status: 400 });
     }
@@ -65,7 +104,10 @@ export async function POST(
     }
 
     const client = await clientPromise;
-    const result = await client.db(dbName).collection(collectionName).insertMany(data);
+    const result = await client
+      .db(dbName)
+      .collection(collectionName)
+      .insertMany(data as Record<string, unknown>[], { ordered: false });
 
     return NextResponse.json({
       message: `Successfully imported ${result.insertedCount} documents`,

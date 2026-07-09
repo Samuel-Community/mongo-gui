@@ -2,7 +2,7 @@
 
 import Sidebar from "@/src/components/custom/Sidebar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Layers, ChevronRight, Database, ArrowLeft, Trash2, AlertTriangle, X } from "lucide-react";
+import { Loader2, Layers, ChevronRight, Database, ArrowLeft, Trash2, AlertTriangle, X, Lock } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
 import { useParams } from "next/navigation";
@@ -27,6 +27,21 @@ export default function CollectionsPage() {
       return res.json();
     },
   });
+
+  const { data: appInfo } = useQuery({
+    queryKey: ["app-info"],
+    queryFn: async () => {
+      const res = await fetch("/api/app");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to fetch app mode");
+      return json as { mode: "full" | "readonly"; readonly: boolean; systemDatabases: string[] };
+    },
+    staleTime: 60_000,
+  });
+
+  const isReadOnlyMode = appInfo?.readonly === true;
+  const isSystemDatabase = (appInfo?.systemDatabases ?? ["admin", "local", "config"]).includes(String(dbName));
+  const writesDisabled = isReadOnlyMode || isSystemDatabase;
 
   const deleteMutation = useMutation({
     mutationFn: async (collectionName: string) => {
@@ -56,12 +71,13 @@ export default function CollectionsPage() {
   const handleDeleteClick = (e: React.MouseEvent, collectionName: string) => {
     e.preventDefault();
     e.stopPropagation();
+    if (writesDisabled) return;
     setCollectionToDelete(collectionName);
     setDeleteError(null);
   };
 
   const confirmDelete = () => {
-    if (confirmName === collectionToDelete) {
+    if (!writesDisabled && confirmName === collectionToDelete) {
       setIsDeleting(true);
       deleteMutation.mutate(collectionToDelete);
     }
@@ -86,6 +102,16 @@ export default function CollectionsPage() {
             <p className="text-gray-500 dark:text-compass-muted mt-2">Browse collections in this database.</p>
           </header>
 
+          {writesDisabled && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              <Lock size={20} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Read-only protection enabled</p>
+                <p className="text-sm opacity-90">Collection drop actions are disabled in the UI and blocked by the API.</p>
+              </div>
+            </div>
+          )}
+
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Loader2 className="animate-spin mb-4" size={32} />
@@ -109,6 +135,8 @@ export default function CollectionsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                          disabled={writesDisabled}
+                          title={writesDisabled ? "Read-only mode is enabled" : undefined}
                           onClick={(e) => handleDeleteClick(e, col.name)}
                         >
                           <Trash2 size={16} />
@@ -189,7 +217,7 @@ export default function CollectionsPage() {
                   </Button>
                   <Button
                     onClick={confirmDelete}
-                    disabled={confirmName !== collectionToDelete || isDeleting}
+                    disabled={writesDisabled || confirmName !== collectionToDelete || isDeleting}
                     className={cn(
                       "min-w-[120px]",
                       confirmName === collectionToDelete 

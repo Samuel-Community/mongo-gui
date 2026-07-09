@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/src/lib/mongodb';
-import { SYSTEM_DATABASES } from '@/src/lib/constants';
+import { blockSystemDatabaseWrite, ensureWritable } from '@/src/lib/api-guards';
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ dbName: string; collectionName: string }> }
 ) {
+  const readonly = ensureWritable();
+  if (readonly) return readonly;
+
   try {
     const { dbName, collectionName } = await params;
-
-    // Block operations on system databases — with an actual return this time
-    if ((SYSTEM_DATABASES as readonly string[]).includes(dbName)) {
-      return NextResponse.json(
-        { error: `Cannot drop collections from system database "${dbName}"` },
-        { status: 403 }
-      );
-    }
+    const systemBlocked = blockSystemDatabaseWrite(dbName);
+    if (systemBlocked) return systemBlocked;
 
     const client = await clientPromise;
     await client.db(dbName).collection(collectionName).drop();

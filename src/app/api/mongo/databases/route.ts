@@ -1,14 +1,8 @@
-import { NextResponse } from "next/server";
-import clientPromise from "@/src/lib/mongodb";
+import { NextResponse } from 'next/server';
 
 export async function GET() {
-  try {
-    const client = await clientPromise;
-    const adminDb = client.db().admin();
-    const dbs = await adminDb.listDatabases();
-    
-    return NextResponse.json(dbs);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  return NextResponse.json(
+    { error: 'Deprecated endpoint. Use /api/databases instead.' },
+    { status: 410 }
+  );
 }

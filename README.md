@@ -1,119 +1,197 @@
-# MongoGUI - Modern MongoDB Web Manager 🚀
+# MongoDB WebGUI Modern
 
-MongoGUI is a professional, lightweight web-based administration interface for MongoDB, built with **Next.js 15**, **Tailwind CSS 4**, and **Monaco Editor**. It provides a sleek alternative to heavy desktop clients for managing local or remote databases with real-time analytics.
+Open-source MongoDB web interface inspired by MongoDB Compass.
 
-## ✨ Features
+This project provides a browser-based GUI for exploring MongoDB databases, collections, documents, indexes, schema information, validation rules, aggregation pipelines, explain plans, and collection stats.
 
-* **Real-Time Dashboard**: Live monitoring of server health (RAM, CPU usage, active connections, and uptime).
-* **Global Analytics**: Intelligent aggregation of storage size and document counts across all databases.
-* **Pro Code Editor**: Integrated **Monaco Editor** (VS Code engine) with syntax highlighting and strict JSON validation.
-* **User Settings**: Update your administrator password directly from the interface.
-* **Smart Security**: Save button automatically disables if JSON syntax is invalid.
-* **Responsive UI**: Modern design with dark/light mode support and a fixed sidebar.
+> ⚠️ This is an administrative tool. Do not expose it directly to the public internet without HTTPS, strong authentication, rate limiting, and a MongoDB user with the minimum required privileges.
 
----
+## Main features
 
-## 🛠️ Tech Stack
+- Secure admin login with JWT cookie and bcrypt password hashing.
+- MongoDB databases and collections browser.
+- Compass-like collection workspace with tabs:
+  - Documents
+  - Aggregations
+  - Schema
+  - Indexes
+  - Explain Plan
+  - Validation
+  - Stats
+- Query bar with `Filter`, `Project`, and `Sort` fields.
+- Document views: Tree, JSON, and Table.
+- JSON import and current-page export to JSON/CSV.
+- Document edit/delete actions.
+- Index list/create/drop actions.
+- Aggregation preview builder with `$out` and `$merge` disabled by default.
+- Schema analyzer based on a random sample.
+- Explain plan summary and raw output.
+- Collection stats via `collStats`.
+- Read-only mode for safer deployments.
+- Safer Nginx and PM2 examples.
 
-* **Framework**: [Next.js 15](https://nextjs.org/) (App Router)
-* **Styling**: Tailwind CSS 4 + Shadcn UI (Radix UI)
-* **Database**: MongoDB (Data) & SQLite (Auth)
-* **Security**: BcryptJS & Jose (JWT)
+## Requirements
 
----
+- Node.js 20+
+- MongoDB 6+
+- npm
 
-## 🚀 Installation & First Launch
+## Installation
 
-### 1. Setup
 ```bash
-git clone https://github.com/Samuel-Community/mongo-gui.git
-cd mongo-gui-modern
 npm install
+cp .env.example .env
+npm run build
+npm run start:4000
 ```
 
-### 2. Environment Variables
+The app listens on `127.0.0.1` by default in the provided scripts. Put Nginx, Caddy, or another reverse proxy in front of it.
 
-Create a `.env` file in the root directory. For maximum security, generate your **JWT_SECRET** using:
-
-```bash
-openssl rand -base64 32
-```
-
-Add it to your `.env`:
+## Environment variables
 
 ```env
 MONGODB_URI=mongodb://localhost:27017
-JWT_SECRET=your_generated_key
+JWT_SECRET=change_me_with_a_long_random_secret_at_least_32_chars
+MONGO_GUI_MODE=full
+MONGO_QUERY_MAX_TIME_MS=5000
+MAX_IMPORT_BODY_BYTES=20971520
+MAX_QUERY_STRING_LENGTH=20000
+MAX_AGGREGATION_STAGES=25
+MAX_SCHEMA_SAMPLE_SIZE=1000
 ```
 
-### 🔑 3. Retrieving Your Credentials
+### Read-only mode
 
-The application features an **Automatic Setup** mode:
+Use read-only mode when you only want to inspect data:
 
-1. Start the server: `npm run dev`.
-2. Open your browser at `http://localhost:3000`.
-3. **Check your terminal**: As soon as the page loads, a yellow box will appear in your console containing your auto-generated `admin` credentials.
-4. **Important**: Log in and go to the **Settings** section to change your password for better security.
-![image](https://media.tutorapide.xyz/zWkNEZofUoR3.png)
+```env
+MONGO_GUI_MODE=readonly
+```
 
----
+This blocks:
 
-## 📦 Production Deployment (VPS)
+- document import
+- document update/delete
+- database drop
+- collection drop
+- index create/drop
+- validation changes
 
-### 1. Build & Run with PM2
-To keep the app running 24/7. Note that the `-p` (port) and `-H` (hostname) flags are optional:
+## Recommended MongoDB user
+
+Create a MongoDB user with only the permissions needed for the deployment.
+
+For a safe read-only deployment, use a read-only MongoDB user and set:
+
+```env
+MONGO_GUI_MODE=readonly
+```
+
+For a full admin deployment, restrict access by IP/VPN and use HTTPS.
+
+## Production with PM2
 
 ```bash
-# Generate the production build
 npm run build
-
-# Start the application
-
-pm2 start npm --name "mongo-gui" -- start
-
-# Use -p to change the port (default 3000)
-# Use -H 127.0.0.1 to restrict access to localhost only (more secure with Nginx)
-pm2 start npm --name "mongo-gui" -- start -- -p 4000 -H 127.0.0.1
+pm2 start ecosystem.config.cjs
 pm2 save
 ```
-Note: Removing -H 127.0.0.1 will allow you to access the app directly via http://your-server-ip:4000. Keeping it ensures that only your Nginx reverse proxy can talk to the app, which is the recommended setup for production
 
-### 2. Reverse Proxy Configuration (Nginx)
+The included PM2 config runs:
 
-Access the app via your domain (e.g., `https://domain.com`):
+```bash
+npm run start:4000
+```
 
-Replace domain.com with your domain
+which binds Next.js to `127.0.0.1:4000`.
 
-[nginx](./mongo.conf)
+## Production with Nginx
 
----
+A safer example config is included in `mongo.conf`.
 
-## 🔒 Security & Networking
+Important defaults:
 
-* **IP Restriction**: Binding to `127.0.0.1` ensures the app is invisible to the public internet except through your domain.
-* **JWT Middleware**: Every internal route is protected. Unauthorized requests are automatically redirected to the login page.
-* **Dynamic Detection**: The middleware uses advanced header detection to ensure perfect redirects behind Nginx.
+- `client_max_body_size 20m`
+- login rate limit
+- API rate limit
+- proxy only to `127.0.0.1:4000`
+- sensitive files denied
 
----
+## Security notes
+
+The project includes several safety protections:
+
+- JWT auth cookie is `httpOnly`.
+- `JWT_SECRET` is required.
+- bcrypt is used for password hashing.
+- System databases `admin`, `local`, and `config` cannot be modified from the UI.
+- Query execution has `maxTimeMS`.
+- Import size and document count are limited.
+- `$where`, `$function`, and `$accumulator` are blocked in user-provided JSON.
+- Aggregation write stages `$out` and `$merge` are blocked.
+- Deprecated `/api/mongo/databases` endpoint returns `410`.
+
+Known limitations:
+
+- Rate limiting is still in memory. For multi-instance production, use Redis or Nginx limits.
+- Large exports currently export only the current loaded page.
+- The aggregation builder is JSON-based, not a full visual builder yet.
+- Multi-connection management is not implemented yet.
+- Role-based users are not implemented yet.
+
+## Development roadmap
+
+Next improvements recommended:
+
+- Multi-connection manager with encrypted connection secrets.
+- Users and roles: `readonly`, `editor`, `admin`.
+- Audit logs for destructive actions.
+- Streaming export for large collections.
+- Cursor-based pagination for huge collections.
+- Saved queries and saved pipelines.
+- Visual aggregation stage builder.
+- Visual explain plan tree.
+
+## License
+
+MIT
+
+## Monaco Editor notes
+
+This project keeps Monaco Editor for a Compass-like JSON editing experience.
+During `npm install`, the `postinstall` script copies Monaco assets from:
+
+```txt
+node_modules/monaco-editor/min/vs
+```
+
+to:
+
+```txt
+public/monaco/vs
+```
+
+If Monaco fails to load in development, run:
+
+```bash
+npm run postinstall
+```
+
+Then restart the dev server.
 
 
-## 🖼️ Screen
+## Read-only UI protection
 
-![login](https://media.tutorapide.xyz/Nvsw402SUImx.png)
-![dasboard](https://media.tutorapide.xyz/d9kuOaAmeCmH.png)
-![database](https://media.tutorapide.xyz/IzSAvupLDrEj.png)
-![stats](https://media.tutorapide.xyz/tPROsqDWfydV.png)
-![settings](https://media.tutorapide.xyz/YlqD5IM4RSnw.png)
+When `MONGO_GUI_MODE=readonly`, write actions are blocked server-side and disabled in the interface. This disables imports, document edits/deletes, bulk updates/deletes, database/collection drops, index creation/drop and validator updates.
 
----
-## 🤖 AI Contribution
 
-Developed with AI assistance to optimize Nginx configurations, Next.js 15 middleware logic, and secure authentication workflows.
+## Search engine indexing
 
----
+MongoGUI is an administration interface and should not be indexed by search engines.
+The app includes multiple protections by default:
 
-## 📝 License
+- `public/robots.txt` blocks all crawlers.
+- Next.js metadata sets `robots: noindex, nofollow`.
+- Every response includes `X-Robots-Tag: noindex, nofollow, noarchive, nosnippet, noimageindex`.
 
-MIT License.
-
-Developed with ❤️ by [Samuel-TutoRapide](https://github.com/Samuel-TutoRapide)
+If you deploy behind Nginx, keep the same `X-Robots-Tag` header in your reverse proxy configuration too.

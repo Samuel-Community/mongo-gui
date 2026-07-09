@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/src/lib/mongodb';
 import { ObjectId } from 'mongodb';
+import { blockSystemDatabaseWrite, ensureWritable } from '@/src/lib/api-guards';
+import { MONGO_QUERY_MAX_TIME_MS } from '@/src/lib/constants';
 
 type Params = { params: Promise<{ dbName: string; collectionName: string; docId: string }> };
 
@@ -9,13 +11,22 @@ function parseObjectId(id: string): ObjectId | null {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
+  const readonly = ensureWritable();
+  if (readonly) return readonly;
+
   try {
     const { dbName, collectionName, docId } = await params;
+    const systemBlocked = blockSystemDatabaseWrite(dbName);
+    if (systemBlocked) return systemBlocked;
+
     const oid = parseObjectId(docId);
     if (!oid) return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 });
 
     const client = await clientPromise;
-    const result = await client.db(dbName).collection(collectionName).deleteOne({ _id: oid });
+    const result = await client
+      .db(dbName)
+      .collection(collectionName)
+      .deleteOne({ _id: oid }, { maxTimeMS: MONGO_QUERY_MAX_TIME_MS });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });
@@ -28,8 +39,14 @@ export async function DELETE(_request: Request, { params }: Params) {
 }
 
 export async function PATCH(request: Request, { params }: Params) {
+  const readonly = ensureWritable();
+  if (readonly) return readonly;
+
   try {
     const { dbName, collectionName, docId } = await params;
+    const systemBlocked = blockSystemDatabaseWrite(dbName);
+    if (systemBlocked) return systemBlocked;
+
     const oid = parseObjectId(docId);
     if (!oid) return NextResponse.json({ error: 'Invalid document ID' }, { status: 400 });
 
@@ -38,14 +55,14 @@ export async function PATCH(request: Request, { params }: Params) {
       return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
     }
 
-    // Remove _id to avoid MongoDB immutable field error
     const { _id, ...updateData } = body as Record<string, unknown>;
     void _id;
 
     const client = await clientPromise;
-    const result = await client.db(dbName).collection(collectionName).updateOne(
+    const result = await client.db(dbName).collection(collectionName).replaceOne(
       { _id: oid },
-      { $set: updateData }
+      { _id: oid, ...updateData },
+      { maxTimeMS: MONGO_QUERY_MAX_TIME_MS }
     );
 
     if (result.matchedCount === 0) {

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cn } from "@/src/lib/utils";
 import Sidebar from "@/src/components/custom/Sidebar";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Database, ExternalLink, HardDrive, Trash2, AlertTriangle, X } from "lucide-react";
+import { Loader2, Database, ExternalLink, HardDrive, Trash2, AlertTriangle, X, Lock } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/src/components/ui/button";
 import { Input } from "@/src/components/ui/input";
@@ -26,8 +26,22 @@ export default function DatabasesPage() {
     },
   });
 
+  const { data: appInfo } = useQuery({
+    queryKey: ["app-info"],
+    queryFn: async () => {
+      const res = await fetch("/api/app");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to fetch app mode");
+      return json as { mode: "full" | "readonly"; readonly: boolean; systemDatabases: string[] };
+    },
+    staleTime: 60_000,
+  });
+
+  const isReadOnlyMode = appInfo?.readonly === true;
+  const systemDatabases = appInfo?.systemDatabases ?? ["admin", "local", "config"];
+
   const handleDropDatabase = async () => {
-    if (!dbToDrop || confirmName !== dbToDrop) return;
+    if (isReadOnlyMode || !dbToDrop || confirmName !== dbToDrop) return;
 
     setIsDropping(true);
     setDropError(null);
@@ -67,6 +81,16 @@ export default function DatabasesPage() {
               <span>{databases?.length ?? 0} Databases</span>
             </div>
           </header>
+
+          {isReadOnlyMode && (
+            <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              <Lock size={20} className="mt-0.5 shrink-0" />
+              <div>
+                <p className="font-semibold">Read-only mode enabled</p>
+                <p className="text-sm opacity-90">Database drop actions are disabled in the UI and blocked by the API.</p>
+              </div>
+            </div>
+          )}
 
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -115,11 +139,13 @@ export default function DatabasesPage() {
                                 <ExternalLink size={14} />
                               </Button>
                             </Link>
-                            {!["admin", "local", "config"].includes(db.name) ? (
+                            {!systemDatabases.includes(db.name) ? (
                               <Button 
                                 variant="ghost" 
                                 size="sm" 
                                 onClick={() => setDbToDrop(db.name)}
+                                disabled={isReadOnlyMode}
+                                title={isReadOnlyMode ? "Read-only mode is enabled" : undefined}
                                 className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
                               >
                                 <Trash2 size={14} />
@@ -155,11 +181,13 @@ export default function DatabasesPage() {
                           <ExternalLink size={16} />
                         </Button>
                       </Link>
-                      {!["admin", "local", "config"].includes(db.name) && (
+                      {!systemDatabases.includes(db.name) && (
                         <Button 
                           variant="outline" 
                           className="h-12 w-12 text-red-500 border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-950/30"
                           onClick={() => setDbToDrop(db.name)}
+                          disabled={isReadOnlyMode}
+                          title={isReadOnlyMode ? "Read-only mode is enabled" : undefined}
                         >
                           <Trash2 size={18} />
                         </Button>
@@ -234,7 +262,7 @@ export default function DatabasesPage() {
                   </Button>
                   <Button
                     onClick={handleDropDatabase}
-                    disabled={confirmName !== dbToDrop || isDropping}
+                    disabled={isReadOnlyMode || confirmName !== dbToDrop || isDropping}
                     className={cn(
                       "min-w-[120px]",
                       confirmName === dbToDrop 

@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'mongo-gui',
       script: 'npm',
-      args: 'start -- -p 4000', // Le -- est important pour passer l'argument -p à Next.js
+      args: 'run start:4000',
       instances: 1,
       autorestart: true,
       watch: false,

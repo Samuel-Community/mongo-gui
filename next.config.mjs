@@ -5,10 +5,8 @@ const nextConfig = {
   compress:                    true,
 
   typescript: { ignoreBuildErrors: false },
-  eslint:     { ignoreDuringBuilds: false },
 
   experimental: {
-    // Tree-shake heavy icon/chart libraries
     optimizePackageImports: [
       'lucide-react',
       'recharts',
@@ -16,8 +14,6 @@ const nextConfig = {
       '@radix-ui/react-label',
       '@radix-ui/react-slot',
     ],
-    // Inline critical CSS into <head> instead of a separate blocking request
-    // Eliminates the "render-blocking layout.css" warning entirely
     inlineCss: true,
   },
 
@@ -26,30 +22,28 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [
-          { key: 'X-Content-Type-Options',  value: 'nosniff'                         },
-          { key: 'X-Frame-Options',         value: 'SAMEORIGIN'                      },
-          { key: 'X-DNS-Prefetch-Control',  value: 'on'                              },
-          { key: 'Referrer-Policy',         value: 'strict-origin-when-cross-origin' },
-          { key: 'Permissions-Policy',      value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'X-DNS-Prefetch-Control', value: 'on' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet, noimageindex' },
           {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob:",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
               "img-src 'self' data: blob:",
-              "worker-src blob:",
+              "worker-src 'self' blob:",
               "connect-src 'self'",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+              "frame-ancestors 'self'",
             ].join('; '),
           },
-        ],
-      },
-      // Static assets cached forever (Next.js fingerprints filenames)
-      {
-        source: '/_next/static/(.*)',
-        headers: [
-          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
     ];

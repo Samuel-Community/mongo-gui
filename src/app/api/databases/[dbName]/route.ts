@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
 import clientPromise from '@/src/lib/mongodb';
-import { SYSTEM_DATABASES } from '@/src/lib/constants';
+import { ensureWritable, isSystemDatabase } from '@/src/lib/api-guards';
 
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ dbName: string }> }
 ) {
+  const readonly = ensureWritable();
+  if (readonly) return readonly;
+
   try {
     const { dbName } = await params;
 
-    if ((SYSTEM_DATABASES as readonly string[]).includes(dbName)) {
+    if (isSystemDatabase(dbName)) {
       return NextResponse.json(
         { error: `Cannot drop system database "${dbName}"` },
         { status: 403 }
