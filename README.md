@@ -1,4 +1,4 @@
-![banner](https://ibb.co/W7M6wH0)
+<a href="https://ibb.co/W7M6wH0"><img src="https://i.ibb.co/TJ7kSw1/banner.png" alt="banner" border="0"></a>
 # MongoDB WebGUI Modern
 
 Open-source MongoDB web interface inspired by MongoDB Compass.
