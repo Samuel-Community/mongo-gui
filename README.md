@@ -1,3 +1,4 @@
+![banner](https://ibb.co/W7M6wH0)
 # MongoDB WebGUI Modern
 
 Open-source MongoDB web interface inspired by MongoDB Compass.
